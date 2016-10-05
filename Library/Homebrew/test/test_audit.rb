@@ -292,6 +292,19 @@ class FormulaAuditorTests < Homebrew::TestCase
       fa.problems
   end
 
+  def test_audit_specs
+    fa = formula_auditor "foo", <<-EOS.undent, online: true
+      class Foo < Formula
+        homepage "https://example.com/foo"
+        url "http://example.com/foo-1.0.tgz"
+        mirror "http://badexample.com/foo-1.0.tgz"
+      end
+    EOS
+    fa.audit_specs
+    assert_equal ["Stable: http://badexample.com/foo-1.0.tgz is not reachable " \
+      "(curl exit code #{$?.exitstatus})"], fa.problems
+  end
+
   def test_audit_line_pkgshare
     fa = formula_auditor "foo", <<-EOS.undent, strict: true
       class Foo < Formula

@@ -603,7 +603,7 @@ class FormulaAuditor
     %w[Stable Devel HEAD].each do |name|
       next unless spec = formula.send(name.downcase)
 
-      ra = ResourceAuditor.new(spec).audit
+      ra = ResourceAuditor.new(spec, online: @online).audit
       problems.concat ra.problems.map { |problem| "#{name}: #{problem}" }
 
       spec.resources.each_value do |resource|
@@ -1051,10 +1051,14 @@ class FormulaAuditor
 end
 
 class ResourceAuditor
+  DEFAULTS = { online: false }.freeze
+
   attr_reader :problems
   attr_reader :version, :checksum, :using, :specs, :url, :mirrors, :name
 
-  def initialize(resource)
+  def initialize(resource, options = {})
+    @options  = DEFAULTS.merge options
+    @online   = @options[:online]
     @name     = resource.name
     @version  = resource.version
     @checksum = resource.checksum
@@ -1168,6 +1172,14 @@ class ResourceAuditor
     if mirrors.include?(url)
       problem "URL should not be duplicated as a mirror: #{url}"
     end
+
+    mirrors.each do |url|
+      begin
+        nostdout { curl "--connect-timeout", "15", "-o", "/dev/null", url }
+      rescue ErrorDuringExecution
+        problem "#{url} is not reachable (curl exit code #{$?.exitstatus})"
+      end
+    end if @online
 
     urls = [url] + mirrors
 
